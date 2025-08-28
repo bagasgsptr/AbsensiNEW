@@ -1,328 +1,499 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Absensi Wajah Web</title>
-<script src="https://cdn.tailwindcss.com"></script>
-<script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.min.js"></script>
-<style>
-  * { scrollbar-width: thin; }
-  .btn { @apply px-4 py-2 rounded-2xl shadow text-white transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed; }
-  .btn-primary { @apply bg-indigo-600 hover:bg-indigo-500; }
-  .btn-danger { @apply bg-rose-600 hover:bg-rose-500; }
-  .btn-secondary { @apply bg-slate-700 hover:bg-slate-600; }
-  .card { @apply bg-white rounded-2xl shadow-lg p-4 transition hover:shadow-xl; }
-  .chip { @apply inline-flex items-center gap-2 text-xs font-medium px-3 py-1 rounded-full bg-slate-100; }
-  .toast { @apply fixed bottom-4 right-4 bg-slate-800 text-white px-4 py-2 rounded-2xl shadow-lg opacity-0 pointer-events-none transition-opacity; }
-  .toast.show { opacity: 1; pointer-events-auto; }
-  #vid-enroll, #vid-absen { aspect-ratio: 4/3; object-fit: cover; border-radius: 1rem; }
-  canvas { border-radius: 1rem; }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Absensi Wajah Keren</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Face API -->
+  <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.min.js"></script>
+  <style>
+    /* Scrollbar halus */
+    * { scrollbar-width: thin; }
+    .btn { @apply px-4 py-2 rounded-2xl shadow text-white transition active:scale-95; }
+    .btn-primary { @apply bg-indigo-600 hover:bg-indigo-500; }
+    .btn-danger { @apply bg-rose-600 hover:bg-rose-500; }
+    .btn-secondary { @apply bg-slate-700 hover:bg-slate-600; }
+    .card { @apply bg-white rounded-2xl shadow-lg p-4; }
+    .chip { @apply inline-flex items-center gap-2 text-xs font-medium px-3 py-1 rounded-full bg-slate-100; }
+  </style>
 </head>
 <body class="min-h-screen bg-slate-50 text-slate-800">
-
-<header class="sticky top-0 z-40 bg-white/80 backdrop-blur border-b border-slate-200">
-  <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-    <div class="flex items-center gap-3">
-      <span class="w-9 h-9 grid place-items-center rounded-2xl bg-indigo-600 text-white font-bold">AW</span>
-      <h1 class="text-lg font-semibold">Absensi Wajah</h1>
+  <!-- Navbar -->
+  <header class="sticky top-0 z-40 bg-white/80 backdrop-blur border-b border-slate-200">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <span class="w-9 h-9 grid place-items-center rounded-2xl bg-indigo-600 text-white font-bold">AW</span>
+        <h1 class="text-lg font-semibold">Absensi Wajah</h1>
+      </div>
+      <nav class="flex gap-2">
+        <button id="tab-admin" class="btn btn-secondary">Admin</button>
+        <button id="tab-absen" class="btn btn-primary">Mahasiswa</button>
+        <button id="tab-setting" class="btn btn-secondary">Pengaturan</button>
+      </nav>
     </div>
-    <nav class="flex gap-2">
-      <button id="tab-admin" class="btn btn-secondary">Admin</button>
-      <button id="tab-absen" class="btn btn-primary">Mahasiswa</button>
-      <button id="tab-setting" class="btn btn-secondary">Pengaturan</button>
-    </nav>
-  </div>
-</header>
+  </header>
 
-<main class="max-w-6xl mx-auto p-4 grid gap-4">
-  <!-- Panel info -->
-  <section class="grid lg:grid-cols-3 gap-4">
-    <div class="card col-span-2">
-      <h2 class="text-xl font-semibold">Status Model</h2>
-      <div id="modelStatus" class="mt-2 text-sm text-slate-600">Menunggu inisialisasi...</div>
-      <div class="mt-3 h-2 bg-slate-200 rounded-full overflow-hidden">
-        <div id="modelProgress" class="h-full w-0 bg-indigo-500 transition-all"></div>
-      </div>
-      <div class="mt-3 text-xs text-slate-500">Model diambil dari CDN: <code>@vladmandic/face-api</code></div>
-    </div>
-    <div class="card">
-      <h2 class="text-xl font-semibold">Ringkas Data</h2>
-      <div class="mt-3 grid grid-cols-2 gap-3 text-sm">
-        <div class="chip">Terdaftar: <span id="statRegistered" class="font-semibold">0</span></div>
-        <div class="chip">Absensi: <span id="statAttendance" class="font-semibold">0</span></div>
-      </div>
-      <div class="mt-4 flex gap-2 flex-wrap">
-        <button id="btn-export-json" class="btn btn-secondary">Export Data (.json)</button>
-        <label class="btn btn-secondary cursor-pointer">
-          Import Data<input id="file-import-json" type="file" accept="application/json" class="hidden" />
-        </label>
-      </div>
-    </div>
-  </section>
-
-  <!-- Admin -->
-  <section id="view-admin" class="grid lg:grid-cols-5 gap-4">
-    <div class="card lg:col-span-2">
-      <h3 class="text-lg font-semibold">Daftarkan Mahasiswa</h3>
-      <p class="text-sm text-slate-600">Isi identitas lalu ambil beberapa contoh wajah.</p>
-      <div class="mt-3 grid gap-2">
-        <input id="in-nama" class="border rounded-xl px-3 py-2" placeholder="Nama lengkap" />
-        <input id="in-npm" class="border rounded-xl px-3 py-2" placeholder="NPM" />
-      </div>
-      <div class="mt-3 grid gap-3">
-        <div class="grid sm:grid-cols-2 gap-3">
-          <button id="btn-start-enroll" class="btn btn-primary">Mulai Kamera</button>
-          <button id="btn-stop-enroll" class="btn btn-danger">Matikan Kamera</button>
+  <main class="max-w-6xl mx-auto p-4 grid gap-4">
+    <!-- Papan info -->
+    <section class="grid lg:grid-cols-3 gap-4">
+      <div class="card col-span-2">
+        <h2 class="text-xl font-semibold">Status Model</h2>
+        <div id="modelStatus" class="mt-2 text-sm text-slate-600">Menunggu inisialisasi...</div>
+        <div class="mt-3 h-2 bg-slate-200 rounded-full overflow-hidden">
+          <div id="modelProgress" class="h-full w-0 bg-indigo-500 transition-all"></div>
         </div>
-        <div class="text-sm text-slate-600">Target contoh: <span id="sampleTarget">5</span> · Terkumpul: <span id="sampleCount">0</span></div>
-        <div class="h-2 bg-slate-200 rounded-full overflow-hidden"><div id="enrollProgress" class="h-full w-0 bg-emerald-500 transition-all"></div></div>
-        <div class="grid sm:grid-cols-2 gap-3">
-          <button id="btn-capture" class="btn btn-secondary">Ambil Contoh</button>
-          <button id="btn-save-student" class="btn btn-primary">Simpan Mahasiswa</button>
+        <div class="mt-3 text-xs text-slate-500">Model diambil dari CDN: <code>@vladmandic/face-api</code></div>
+      </div>
+      <div class="card">
+        <h2 class="text-xl font-semibold">Ringkas Data</h2>
+        <div class="mt-3 grid grid-cols-2 gap-3 text-sm">
+          <div class="chip">Terdaftar: <span id="statRegistered" class="font-semibold">0</span></div>
+          <div class="chip">Absensi: <span id="statAttendance" class="font-semibold">0</span></div>
+        </div>
+        <div class="mt-4 flex gap-2">
+          <button id="btn-export-json" class="btn btn-secondary">Export Data (.json)</button>
+          <label class="btn btn-secondary cursor-pointer">
+            Import Data<input id="file-import-json" type="file" accept="application/json" class="hidden" />
+          </label>
         </div>
       </div>
-      <div class="mt-4 relative">
-        <video id="vid-enroll" autoplay muted playsinline class="w-full rounded-xl border"></video>
-        <canvas id="cv-enroll" class="absolute inset-0 pointer-events-none"></canvas>
-      </div>
-      <div class="mt-2 grid grid-cols-5 gap-2" id="thumbs"></div>
-    </div>
+    </section>
 
-    <div class="card lg:col-span-3">
-      <div class="flex items-center justify-between">
-        <h3 class="text-lg font-semibold">Mahasiswa Terdaftar</h3>
-        <input id="search-student" class="border rounded-xl px-3 py-2" placeholder="Cari nama / NPM" />
+    <!-- Konten: Admin -->
+    <section id="view-admin" class="grid lg:grid-cols-5 gap-4">
+      <div class="card lg:col-span-2">
+        <h3 class="text-lg font-semibold">Daftarkan Mahasiswa</h3>
+        <p class="text-sm text-slate-600">Isi identitas lalu ambil beberapa contoh wajah untuk meningkatkan akurasi.</p>
+        <div class="mt-3 grid gap-2">
+          <input id="in-nama" class="border rounded-xl px-3 py-2" placeholder="Nama lengkap" />
+          <input id="in-npm" class="border rounded-xl px-3 py-2" placeholder="NPM" />
+        </div>
+        <div class="mt-3 grid gap-3">
+          <div class="grid sm:grid-cols-2 gap-3">
+            <button id="btn-start-enroll" class="btn btn-primary">Mulai Kamera</button>
+            <button id="btn-stop-enroll" class="btn btn-danger">Matikan Kamera</button>
+          </div>
+          <div class="text-sm text-slate-600">Target contoh: <span id="sampleTarget">5</span> · Terkumpul: <span id="sampleCount">0</span></div>
+          <div class="h-2 bg-slate-200 rounded-full overflow-hidden"><div id="enrollProgress" class="h-full w-0 bg-emerald-500 transition-all"></div></div>
+          <div class="grid sm:grid-cols-2 gap-3">
+            <button id="btn-capture" class="btn btn-secondary">Ambil Contoh</button>
+            <button id="btn-save-student" class="btn btn-primary">Simpan Mahasiswa</button>
+          </div>
+        </div>
+        <div class="mt-4">
+          <video id="vid-enroll" autoplay muted playsinline class="w-full rounded-xl border"></video>
+          <canvas id="cv-enroll" class="hidden"></canvas>
+        </div>
+        <div class="mt-2 grid grid-cols-5 gap-2" id="thumbs"></div>
       </div>
-      <div class="mt-3 overflow-auto max-h-[480px]">
-        <table class="w-full text-sm">
-          <thead class="bg-slate-100 sticky top-0">
-            <tr>
-              <th class="text-left p-2">Nama</th>
-              <th class="text-left p-2">NPM</th>
-              <th class="text-left p-2">Contoh Wajah</th>
-              <th class="text-left p-2">Aksi</th>
-            </tr>
-          </thead>
-          <tbody id="tbl-students"></tbody>
-        </table>
-      </div>
-    </div>
-  </section>
 
-  <!-- Mahasiswa / Absensi -->
-  <section id="view-absen" class="grid lg:grid-cols-5 gap-4 hidden">
-    <div class="card lg:col-span-3">
-      <h3 class="text-lg font-semibold">Kamera Absensi</h3>
-      <div class="relative mt-3">
-        <video id="vid-absen" autoplay muted playsinline class="w-full rounded-xl border"></video>
-        <canvas id="ov-absen" class="absolute inset-0 pointer-events-none"></canvas>
-      </div>
-      <div class="mt-3 flex flex-wrap gap-2 items-center">
-        <button id="btn-start-absen" class="btn btn-primary">Mulai Kamera</button>
-        <button id="btn-stop-absen" class="btn btn-danger">Matikan Kamera</button>
-        <button id="btn-once-absen" class="btn btn-secondary">Scan Sekali</button>
-        <span id="matchInfo" class="chip">Hasil: -</span>
-      </div>
-      <div id="absenAlert" class="mt-3 hidden p-3 rounded-xl border"></div>
-    </div>
-    <div class="card lg:col-span-2">
-      <div class="flex items-center justify-between">
-        <h3 class="text-lg font-semibold">Riwayat Absensi</h3>
-        <div class="flex gap-2">
-          <button id="btn-export-csv" class="btn btn-secondary">Export CSV</button>
-          <button id="btn-clear-att" class="btn btn-danger">Bersihkan</button>
+      <div class="card lg:col-span-3">
+        <div class="flex items-center justify-between">
+          <h3 class="text-lg font-semibold">Mahasiswa Terdaftar</h3>
+          <input id="search-student" class="border rounded-xl px-3 py-2" placeholder="Cari nama / NPM" />
+        </div>
+        <div class="mt-3 overflow-auto">
+          <table class="w-full text-sm">
+            <thead class="bg-slate-100 sticky top-0">
+              <tr>
+                <th class="text-left p-2">Nama</th>
+                <th class="text-left p-2">NPM</th>
+                <th class="text-left p-2">Contoh Wajah</th>
+                <th class="text-left p-2">Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="tbl-students"></tbody>
+          </table>
         </div>
       </div>
-      <div class="mt-2 h-72 overflow-auto">
-        <table class="w-full text-sm">
-          <thead class="bg-slate-100 sticky top-0">
-            <tr>
-              <th class="text-left p-2">Waktu</th>
-              <th class="text-left p-2">Nama</th>
-              <th class="text-left p-2">NPM</th>
-            </tr>
-          </thead>
-          <tbody id="tbl-att"></tbody>
-        </table>
+    </section>
+
+    <!-- Konten: Mahasiswa / Absensi -->
+    <section id="view-absen" class="grid lg:grid-cols-5 gap-4 hidden">
+      <div class="card lg:col-span-3">
+        <h3 class="text-lg font-semibold">Kamera Absensi</h3>
+        <div class="relative mt-3">
+          <video id="vid-absen" autoplay muted playsinline class="w-full rounded-xl border"></video>
+          <canvas id="ov-absen" class="absolute inset-0"></canvas>
+        </div>
+        <div class="mt-3 flex flex-wrap gap-2 items-center">
+          <button id="btn-start-absen" class="btn btn-primary">Mulai Kamera</button>
+          <button id="btn-stop-absen" class="btn btn-danger">Matikan Kamera</button>
+          <button id="btn-once-absen" class="btn btn-secondary">Scan Sekali</button>
+          <span id="matchInfo" class="chip">Hasil: -</span>
+        </div>
+        <div id="absenAlert" class="mt-3 hidden p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700"></div>
       </div>
-    </div>
-  </section>
-
-  <!-- Pengaturan -->
-  <section id="view-setting" class="grid lg:grid-cols-3 gap-4 hidden">
-    <div class="card">
-      <h3 class="text-lg font-semibold">Pengenalan Wajah</h3>
-      <label class="block mt-3 text-sm">Ambang (threshold) kecocokan: <span id="txt-threshold" class="font-semibold"></span></label>
-      <input id="in-threshold" type="range" min="0.3" max="0.8" step="0.01" class="w-full" />
-      <p class="text-xs text-slate-500 mt-1">Semakin kecil nilai ambang, semakin ketat kecocokannya.</p>
-      <div class="mt-3 grid sm:grid-cols-2 gap-2">
-        <button id="btn-rebuild" class="btn btn-secondary">Bangun Ulang Index</button>
-        <button id="btn-clear-all" class="btn btn-danger">Hapus Semua Data</button>
+      <div class="card lg:col-span-2">
+        <div class="flex items-center justify-between">
+          <h3 class="text-lg font-semibold">Riwayat Absensi</h3>
+          <div class="flex gap-2">
+            <button id="btn-export-csv" class="btn btn-secondary">Export CSV</button>
+            <button id="btn-clear-att" class="btn btn-danger">Bersihkan</button>
+          </div>
+        </div>
+        <div class="mt-2 h-72 overflow-auto">
+          <table class="w-full text-sm">
+            <thead class="bg-slate-100 sticky top-0">
+              <tr>
+                <th class="text-left p-2">Waktu</th>
+                <th class="text-left p-2">Nama</th>
+                <th class="text-left p-2">NPM</th>
+              </tr>
+            </thead>
+            <tbody id="tbl-att"></tbody>
+          </table>
+        </div>
       </div>
-    </div>
-    <div class="card lg:col-span-2">
-      <h3 class="text-lg font-semibold">Catatan & Tips</h3>
-      <ul class="list-disc pl-6 text-sm text-slate-600 mt-2">
-        <li>Ambil minimal 5 contoh wajah untuk tiap mahasiswa.</li>
-        <li>Gunakan pencahayaan cukup, kamera menghadap wajah lurus.</li>
-        <li>Jika akurasi kurang, turunkan threshold atau tambah contoh wajah.</li>
-        <li>Data saat ini disimpan di browser (localStorage). Untuk produksi, gunakan backend & database.</li>
-      </ul>
-    </div>
-  </section>
-</main>
+    </section>
 
-<footer class="text-center text-xs text-slate-500 py-6">Frontend demo • face-api.js • Tanpa backend</footer>
+    <!-- Konten: Pengaturan -->
+    <section id="view-setting" class="grid lg:grid-cols-3 gap-4 hidden">
+      <div class="card">
+        <h3 class="text-lg font-semibold">Pengenalan Wajah</h3>
+        <label class="block mt-3 text-sm">Ambang (threshold) kecocokan: <span id="txt-threshold" class="font-semibold"></span></label>
+        <input id="in-threshold" type="range" min="0.3" max="0.8" step="0.01" class="w-full" />
+        <p class="text-xs text-slate-500 mt-1">Semakin kecil nilai ambang, semakin ketat kecocokannya (lebih sedikit false positive).</p>
+        <div class="mt-3 grid sm:grid-cols-2 gap-2">
+          <button id="btn-rebuild" class="btn btn-secondary">Bangun Ulang Index</button>
+          <button id="btn-clear-all" class="btn btn-danger">Hapus Semua Data</button>
+        </div>
+      </div>
 
-<div id="toast" class="toast"></div>
+      <div class="card lg:col-span-2">
+        <h3 class="text-lg font-semibold">Catatan & Tips</h3>
+        <ul class="list-disc pl-6 text-sm text-slate-600 mt-2">
+          <li>Ambil minimal 5 contoh wajah untuk tiap mahasiswa (berbeda sudut dan ekspresi).</li>
+          <li>Gunakan pencahayaan cukup, kamera menghadap wajah lurus.</li>
+          <li>Jika akurasi kurang, turunkan threshold atau tambah contoh wajah.</li>
+          <li>Data saat ini disimpan di browser (localStorage). Untuk produksi, gunakan backend & database.</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <footer class="text-center text-xs text-slate-500 py-6">Frontend demo • face-api.js • Tanpa backend</footer>
 
 <script>
-const STORE = { studentsKey: 'aw.students.v1', attendKey: 'aw.attendance.v1', settingKey: 'aw.settings.v1' };
-let students = JSON.parse(localStorage.getItem(STORE.studentsKey)||'[]');
-let attendance = JSON.parse(localStorage.getItem(STORE.attendKey)||'[]');
-let settings = JSON.parse(localStorage.getItem(STORE.settingKey)||'{"threshold":0.5,"sampleTarget":5}');
+// ======= Penyimpanan =======
+const STORE = {
+  studentsKey: 'aw.students.v1',
+  attendKey: 'aw.attendance.v1',
+  settingKey: 'aw.settings.v1'
+};
+let students = load(STORE.studentsKey, []); // {nama, npm, descriptors: number[][]}
+let attendance = load(STORE.attendKey, []); // {timeISO, nama, npm}
+let settings = load(STORE.settingKey, { threshold: 0.5, sampleTarget: 5 });
 
-function save(key,val){ localStorage.setItem(key,JSON.stringify(val)); }
-function E(id){ return document.getElementById(id); }
+function save(key, val){ localStorage.setItem(key, JSON.stringify(val)); }
+function load(key, fallback){ try{ return JSON.parse(localStorage.getItem(key)) ?? fallback; }catch{ return fallback; } }
 
-const modelStatus=E('modelStatus'), modelProgress=E('modelProgress');
-const statRegistered=E('statRegistered'), statAttendance=E('statAttendance');
-const vidEnroll=E('vid-enroll'), cvEnroll=E('cv-enroll'), thumbs=E('thumbs');
-const sampleTargetEl=E('sampleTarget'), sampleCountEl=E('sampleCount'), enrollProgress=E('enrollProgress');
-const vidAbsen=E('vid-absen'), ovAbsen=E('ov-absen'), absenAlert=E('absenAlert'), matchInfo=E('matchInfo');
-const inThreshold=E('in-threshold'), txtThreshold=E('txt-threshold');
+// ======= Elemen =======
+const E = (id) => document.getElementById(id);
+const modelStatus = E('modelStatus');
+const modelProgress = E('modelProgress');
+const statRegistered = E('statRegistered');
+const statAttendance = E('statAttendance');
+const inThreshold = E('in-threshold');
+const txtThreshold = E('txt-threshold');
 
-let enrollSamples=[], faceMatcher=null;
+const vidEnroll = E('vid-enroll');
+const cvEnroll = E('cv-enroll');
+const thumbs = E('thumbs');
+const sampleTargetEl = E('sampleTarget');
+const sampleCountEl = E('sampleCount');
+const enrollProgress = E('enrollProgress');
 
-function toast(msg,ok=true){
-  const t=E('toast'); t.textContent=msg; t.className='toast show '+(ok?'bg-emerald-600':'bg-rose-600');
-  setTimeout(()=> t.className='toast',3500);
-}
+const vidAbsen = E('vid-absen');
+const ovAbsen = E('ov-absen');
+const absenAlert = E('absenAlert');
+const matchInfo = E('matchInfo');
 
+let enrollSamples = []; // Float32Array[]
+let faceMatcher = null; // faceapi.FaceMatcher
+
+// ======= Navigasi Tab =======
+E('tab-admin').onclick = () => showView('admin');
+E('tab-absen').onclick = () => showView('absen');
+E('tab-setting').onclick = () => showView('setting');
 function showView(name){
-  E('view-admin').classList.toggle('hidden',name!=='admin');
-  E('view-absen').classList.toggle('hidden',name!=='absen');
-  E('view-setting').classList.toggle('hidden',name!=='setting');
+  E('view-admin').classList.toggle('hidden', name!== 'admin');
+  E('view-absen').classList.toggle('hidden', name!== 'absen');
+  E('view-setting').classList.toggle('hidden', name!== 'setting');
 }
-E('tab-admin').onclick=()=>showView('admin');
-E('tab-absen').onclick=()=>showView('absen');
-E('tab-setting').onclick=()=>showView('setting');
+
+// ======= Init =======
+(async function init(){
+  sampleTargetEl.textContent = settings.sampleTarget;
+  inThreshold.value = settings.threshold;
+  txtThreshold.textContent = settings.threshold.toFixed(2);
+  refreshStats();
+  renderStudents();
+  renderAttendance();
+  await loadModels();
+  rebuildIndex();
+  showView('admin');
+})();
 
 async function loadModels(){
-  const base='https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
-  const list=[faceapi.nets.tinyFaceDetector, faceapi.nets.faceLandmark68Net, faceapi.nets.faceRecognitionNet];
-  modelStatus.textContent='Mengunduh model...';
+  const base = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
+  const list = [
+    faceapi.nets.tinyFaceDetector,      // deteksi cepat
+    faceapi.nets.faceLandmark68Net,     // landmark untuk alignment
+    faceapi.nets.faceRecognitionNet     // embedding/descriptor
+  ];
+  modelStatus.textContent = 'Mengunduh model...';
   for(let i=0;i<list.length;i++){
-    modelProgress.style.width=Math.round((i/list.length)*100)+'%';
+    const p = Math.round((i/list.length)*100);
+    modelProgress.style.width = p + '%';
     await list[i].loadFromUri(base);
   }
-  modelProgress.style.width='100%';
-  modelStatus.textContent='Model siap.';
+  modelProgress.style.width = '100%';
+  modelStatus.textContent = 'Model siap.';
 }
 
+// ======= Kamera =======
 async function startStream(videoEl){
   if(videoEl.srcObject) return;
-  try{ const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'},audio:false}); videoEl.srcObject=stream; await videoEl.play(); }catch(err){ alert('Tidak bisa akses kamera'); }
+  try{
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+    videoEl.srcObject = stream;
+    await videoEl.play();
+  }catch(err){ alert('Tidak bisa mengakses kamera: '+ err.message); }
 }
-function stopStream(videoEl){ videoEl.srcObject?.getTracks().forEach(t=>t.stop()); videoEl.srcObject=null; }
+function stopStream(videoEl){
+  const s = videoEl.srcObject; if(!s) return;
+  s.getTracks().forEach(t=>t.stop());
+  videoEl.srcObject = null;
+}
+
+// ======= Enroll/Admin =======
+E('btn-start-enroll').onclick = ()=> startStream(vidEnroll);
+E('btn-stop-enroll').onclick = ()=> stopStream(vidEnroll);
+E('btn-capture').onclick = captureSample;
+E('btn-save-student').onclick = saveStudent;
+E('search-student').oninput = renderStudents;
+
+async function captureSample(){
+  if(!vidEnroll.srcObject){ alert('Nyalakan kamera dulu.'); return; }
+  const det = await faceapi.detectSingleFace(vidEnroll, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
+  if(!det){ alert('Wajah tidak terdeteksi, coba posisikan wajah di tengah, cahaya cukup.'); return; }
+  enrollSamples.push(det.descriptor);
+  sampleCountEl.textContent = enrollSamples.length;
+  enrollProgress.style.width = Math.min(100, (enrollSamples.length / settings.sampleTarget) * 100) + '%';
+  // Simpan thumbnail kecil
+  const thumb = await snapshotFace(vidEnroll, det.detection.box);
+  const img = new Image(); img.src = thumb; img.className = 'w-full rounded-lg border';
+  const wrap = document.createElement('div'); wrap.className = 'rounded-lg overflow-hidden border'; wrap.appendChild(img);
+  thumbs.appendChild(wrap);
+}
+
+async function snapshotFace(videoEl, box){
+  const c = document.createElement('canvas');
+  const size = 128; c.width = size; c.height = size;
+  const ctx = c.getContext('2d');
+  const sx = Math.max(0, box.x - box.width*0.2);
+  const sy = Math.max(0, box.y - box.height*0.2);
+  const sw = Math.min(videoEl.videoWidth - sx, box.width*1.4);
+  const sh = Math.min(videoEl.videoHeight - sy, box.height*1.4);
+  ctx.drawImage(videoEl, sx, sy, sw, sh, 0, 0, size, size);
+  return c.toDataURL('image/jpeg', 0.7);
+}
+
+function resetEnrollUI(){
+  enrollSamples = [];
+  sampleCountEl.textContent = '0';
+  enrollProgress.style.width = '0%';
+  thumbs.innerHTML = '';
+  E('in-nama').value = '';
+  E('in-npm').value = '';
+}
+
+function saveStudent(){
+  const nama = E('in-nama').value.trim();
+  const npm = E('in-npm').value.trim();
+  if(!nama || !npm){ alert('Nama & NPM wajib diisi.'); return; }
+  if(enrollSamples.length < 1){ alert('Ambil minimal 1 contoh wajah (disarankan 5).'); return; }
+  const existingIdx = students.findIndex(s=> s.npm === npm);
+  const pack = enrollSamples.map(f => Array.from(f));
+  if(existingIdx >= 0){
+    // gabungkan contoh lama & baru
+    students[existingIdx].nama = nama;
+    students[existingIdx].descriptors = students[existingIdx].descriptors.concat(pack);
+  } else {
+    students.push({ nama, npm, descriptors: pack });
+  }
+  save(STORE.studentsKey, students);
+  rebuildIndex();
+  renderStudents();
+  refreshStats();
+  resetEnrollUI();
+  alert('Mahasiswa disimpan!');
+}
 
 function renderStudents(){
-  const tbl=E('tbl-students'); tbl.innerHTML='';
-  const filter=E('search-student').value.toLowerCase();
-  for(const s of students){
-    if(s.nama.toLowerCase().includes(filter)||s.npm.toLowerCase().includes(filter)){
-      const tr=document.createElement('tr');
-      tr.innerHTML=`<td class="p-2">${s.nama}</td><td class="p-2">${s.npm}</td>
-      <td class="p-2">${s.samples.length}</td>
-      <td class="p-2"><button class="btn btn-danger text-xs" onclick="deleteStudent('${s.npm}')">Hapus</button></td>`;
-      tbl.appendChild(tr);
-    }
-  }
-  statRegistered.textContent=students.length;
-}
-function deleteStudent(npm){ if(confirm('Hapus mahasiswa?')){ students=students.filter(s=>s.npm!==npm); save(STORE.studentsKey,students); renderStudents(); toast('Dihapus'); buildMatcher(); } }
-
-function updateThumbs(){ thumbs.innerHTML=''; enrollSamples.forEach(s=>{ const img=document.createElement('img'); img.src=s; img.className='rounded-xl border'; img.width=50; img.height=50; thumbs.appendChild(img); }); sampleCountEl.textContent=enrollSamples.length; enrollProgress.style.width=(enrollSamples.length/settings.sampleTarget*100)+'%'; }
-
-E('btn-start-enroll').onclick=()=>startStream(vidEnroll);
-E('btn-stop-enroll').onclick=()=>stopStream(vidEnroll);
-E('btn-capture').onclick=async()=>{
-  if(!vidEnroll.srcObject){ toast('Kamera belum aktif',0); return; }
-  const detections = await faceapi.detectSingleFace(vidEnroll,new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
-  if(!detections){ toast('Wajah tidak terdeteksi',0); return; }
-  const canvas=document.createElement('canvas'); canvas.width=vidEnroll.videoWidth; canvas.height=vidEnroll.videoHeight; canvas.getContext('2d').drawImage(vidEnroll,0,0);
-  enrollSamples.push(canvas.toDataURL('image/jpeg')); updateThumbs();
-  if(enrollSamples.length>=settings.sampleTarget) toast('Target contoh tercapai');
-};
-
-E('btn-save-student').onclick=async()=>{
-  const nama=E('in-nama').value.trim(), npm=E('in-npm').value.trim();
-  if(!nama||!npm||enrollSamples.length<settings.sampleTarget){ toast('Lengkapi data & ambil cukup contoh',0); return; }
-  students.push({nama,npm,samples:enrollSamples}); save(STORE.studentsKey,students);
-  enrollSamples=[]; updateThumbs(); E('in-nama').value=''; E('in-npm').value=''; toast('Mahasiswa disimpan');
-  renderStudents(); buildMatcher();
-};
-
-E('search-student').oninput=renderStudents;
-
-function buildMatcher(){
-  const labeledDescriptors = students.map(s=>{
-    const descs=s.samples.map(imgData=>{
-      const img=new Image(); img.src=imgData;
-      const det=faceapi.detectSingleFace(img,new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
-      return det.descriptor||new Float32Array(128);
+  const q = (E('search-student').value || '').toLowerCase();
+  const body = E('tbl-students');
+  body.innerHTML = '';
+  students
+    .filter(s => s.nama.toLowerCase().includes(q) || s.npm.toLowerCase().includes(q))
+    .forEach((s, i)=>{
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="p-2">${s.nama}</td>
+        <td class="p-2">${s.npm}</td>
+        <td class="p-2">${s.descriptors.length} contoh</td>
+        <td class="p-2">
+          <button class="btn btn-secondary" data-act="add" data-idx="${i}">Tambah Contoh</button>
+          <button class="btn btn-danger" data-act="del" data-idx="${i}">Hapus</button>
+        </td>`;
+      body.appendChild(tr);
     });
-    return new faceapi.LabeledFaceDescriptors(s.npm, descs);
-  });
-  faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, settings.threshold);
+  body.querySelectorAll('button').forEach(btn=> btn.onclick = onStudentAction);
 }
 
-E('btn-start-absen').onclick=()=>startStream(vidAbsen);
-E('btn-stop-absen').onclick=()=>stopStream(vidAbsen);
-E('btn-once-absen').onclick=async()=>{
-  if(!vidAbsen.srcObject){ toast('Kamera belum aktif',0); return; }
-  const det = await faceapi.detectSingleFace(vidAbsen,new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
-  if(!det){ toast('Wajah tidak terdeteksi',0); return; }
-  const bestMatch = faceMatcher.findBestMatch(det.descriptor);
-  matchInfo.textContent='Hasil: '+bestMatch.toString();
-  if(bestMatch.label!=='unknown'){
-    const s=students.find(st=>st.npm===bestMatch.label);
-    attendance.push({waktu:new Date().toLocaleString(),nama:s.nama,npm:s.npm});
-    save(STORE.attendKey,attendance); renderAttendance();
-    toast('Absensi berhasil');
-  }else toast('Tidak terdaftar',0);
-};
+function onStudentAction(e){
+  const act = e.currentTarget.getAttribute('data-act');
+  const idx = +e.currentTarget.getAttribute('data-idx');
+  if(act === 'del'){
+    if(confirm('Hapus data mahasiswa ini?')){
+      students.splice(idx,1);
+      save(STORE.studentsKey, students);
+      rebuildIndex();
+      renderStudents();
+      refreshStats();
+    }
+  } else if(act === 'add'){
+    // Prefill form untuk menambah contoh
+    E('in-nama').value = students[idx].nama;
+    E('in-npm').value = students[idx].npm;
+    showView('admin');
+    alert('Ambil contoh tambahan lalu klik Simpan Mahasiswa.');
+  }
+}
+
+// ======= Absensi / Pengenalan =======
+E('btn-start-absen').onclick = ()=> startStream(vidAbsen);
+E('btn-stop-absen').onclick = ()=> stopStream(vidAbsen);
+E('btn-once-absen').onclick = recognizeOnce;
+
+async function recognizeOnce(){
+  if(!vidAbsen.srcObject){ alert('Nyalakan kamera dulu.'); return; }
+  if(!faceMatcher){ alert('Index belum siap.'); return; }
+  const det = await faceapi.detectSingleFace(vidAbsen, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
+  const ctx = ovAbsen.getContext('2d');
+  ovAbsen.width = vidAbsen.videoWidth; ovAbsen.height = vidAbsen.videoHeight;
+  ctx.clearRect(0,0,ovAbsen.width, ovAbsen.height);
+  if(!det){
+    matchInfo.textContent = 'Hasil: Tidak ada wajah';
+    showAlert('Wajah tidak terdeteksi.', false);
+    return;
+  }
+  // Gambar bbox
+  const { x, y, width, height } = det.detection.box;
+  ctx.strokeStyle = 'rgba(99,102,241,1)';
+  ctx.lineWidth = 3; ctx.strokeRect(x, y, width, height);
+
+  const best = faceMatcher.findBestMatch(det.descriptor);
+  const dist = best.distance;
+  matchInfo.textContent = `Hasil: ${best.label === 'unknown' ? 'Unknown' : best.label} · jarak ${dist.toFixed(3)}`;
+
+  if(best.label !== 'unknown' && dist <= settings.threshold){
+    const st = students.find(s=> s.npm === best.label);
+    const now = new Date();
+    const rec = { timeISO: now.toISOString(), nama: st?.nama || '-', npm: st?.npm || best.label };
+    attendance.push(rec);
+    save(STORE.attendKey, attendance);
+    renderAttendance();
+    refreshStats();
+    showAlert(`✅ Absensi Berhasil: ${rec.nama} (${rec.npm}) — ${now.toLocaleString()}`, true);
+  } else {
+    showAlert('❌ Tidak ada kecocokan yang memenuhi ambang.', false);
+  }
+}
+
+function showAlert(msg, ok){
+  absenAlert.textContent = msg;
+  absenAlert.classList.remove('hidden');
+  absenAlert.className = 'mt-3 p-3 rounded-xl border ' + (ok ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-rose-50 border-rose-200 text-rose-700');
+  setTimeout(()=> absenAlert.classList.add('hidden'), 3500);
+}
 
 function renderAttendance(){
-  const tbl=E('tbl-att'); tbl.innerHTML='';
-  attendance.forEach(a=>{
-    const tr=document.createElement('tr'); tr.innerHTML=`<td class="p-2">${a.waktu}</td><td class="p-2">${a.nama}</td><td class="p-2">${a.npm}</td>`;
-    tbl.appendChild(tr);
+  const body = E('tbl-att');
+  body.innerHTML = '';
+  attendance.slice().reverse().forEach(a=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td class="p-2">${new Date(a.timeISO).toLocaleString()}</td><td class="p-2">${a.nama}</td><td class="p-2">${a.npm}</td>`;
+    body.appendChild(tr);
   });
-  statAttendance.textContent=attendance.length;
 }
-E('btn-clear-att').onclick=()=>{ if(confirm('Hapus semua absensi?')){ attendance=[]; save(STORE.attendKey,attendance); renderAttendance(); toast('Riwayat kosong'); }};
 
-inThreshold.value=settings.threshold; txtThreshold.textContent=settings.threshold;
-inThreshold.oninput=()=>{ settings.threshold=parseFloat(inThreshold.value); txtThreshold.textContent=settings.threshold; save(STORE.settingKey,settings); buildMatcher(); };
+function rebuildIndex(){
+  // Bangun ulang FaceMatcher dari data students
+  const labeled = students.map(s => new faceapi.LabeledFaceDescriptors(
+    s.npm,
+    s.descriptors.map(d => new Float32Array(d))
+  ));
+  faceMatcher = new faceapi.FaceMatcher(labeled, settings.threshold);
+}
 
-E('btn-export-json').onclick=()=>{ const data={students,attendance,settings}; const blob=new Blob([JSON.stringify(data)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='absensi.json'; a.click(); };
+function refreshStats(){
+  statRegistered.textContent = String(students.length);
+  statAttendance.textContent = String(attendance.length);
+}
 
-E('file-import-json').onchange=async(e)=>{
-  const file=e.target.files[0]; if(!file) return;
-  const text=await file.text(); try{ const obj=JSON.parse(text); students=obj.students||[]; attendance=obj.attendance||[]; settings=obj.settings||settings; save(STORE.studentsKey,students); save(STORE.attendKey,attendance); save(STORE.settingKey,settings); toast('Data diimport'); renderStudents(); renderAttendance(); buildMatcher(); }catch{ toast('File salah',0); }
+// ======= Pengaturan =======
+inThreshold.oninput = (e)=> {
+  settings.threshold = +e.target.value;
+  txtThreshold.textContent = settings.threshold.toFixed(2);
+  save(STORE.settingKey, settings);
+  rebuildIndex();
+};
+E('btn-rebuild').onclick = rebuildIndex;
+E('btn-clear-all').onclick = ()=>{
+  if(confirm('Hapus SEMUA data mahasiswa & absensi?')){
+    students = []; attendance = []; save(STORE.studentsKey, students); save(STORE.attendKey, attendance);
+    rebuildIndex(); renderStudents(); renderAttendance(); refreshStats();
+  }
 };
 
-E('btn-export-csv').onclick=()=>{
-  const csv=[['Waktu','Nama','NPM'],...attendance.map(a=>[a.waktu,a.nama,a.npm])].map(r=>r.join(',')).join('\n');
-  const blob=new Blob([csv],{type:'text/csv'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='absensi.csv'; a.click();
+// ======= Export / Import =======
+E('btn-export-json').onclick = ()=>{
+  const blob = new Blob([JSON.stringify({ students, attendance, settings }, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'absensi-wajah-data.json'; a.click();
+};
+E('file-import-json').onchange = (e)=>{
+  const f = e.target.files[0]; if(!f) return;
+  const fr = new FileReader();
+  fr.onload = ()=>{
+    try{
+      const obj = JSON.parse(fr.result);
+      if(obj.students) students = obj.students; if(obj.attendance) attendance = obj.attendance; if(obj.settings) settings = obj.settings;
+      save(STORE.studentsKey, students); save(STORE.attendKey, attendance); save(STORE.settingKey, settings);
+      inThreshold.value = settings.threshold; txtThreshold.textContent = settings.threshold.toFixed(2);
+      rebuildIndex(); renderStudents(); renderAttendance(); refreshStats();
+      alert('Import berhasil.');
+    }catch{ alert('File tidak valid.'); }
+  };
+  fr.readAsText(f);
 };
 
-E('btn-clear-all').onclick=()=>{ if(confirm('Hapus semua data mahasiswa?')){ students=[]; attendance=[]; save(STORE.studentsKey,students); save(STORE.attendKey,attendance); renderStudents(); renderAttendance(); buildMatcher(); toast('Semua data dihapus'); }};
-
-window.onload=async()=>{ await loadModels(); renderStudents(); renderAttendance(); buildMatcher(); };
+// ======= Export CSV Absensi =======
+E('btn-export-csv').onclick = ()=>{
+  const header = 'Waktu,Nama,NPM\n';
+  const rows = attendance.map(a => [`"${new Date(a.timeISO).toLocaleString()}"`, `"${a.nama}"`, `"${a.npm}"`].join(','));
+  const csv = header + rows.join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'absensi.csv'; a.click();
+};
+E('btn-clear-att').onclick = ()=>{
+  if(confirm('Bersihkan semua riwayat absensi?')){
+    attendance = []; save(STORE.attendKey, attendance); renderAttendance(); refreshStats();
+  }
+};
 </script>
 </body>
 </html>
